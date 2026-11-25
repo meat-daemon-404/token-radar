@@ -248,9 +248,11 @@ export function scoreProtocol(
   entry: ProtocolEntry,
   tuning: Tuning = TUNING,
 ): { implied: number; parts: ScoreParts } {
+  const safeTvl = Number.isFinite(entry.tvl_usd) && entry.tvl_usd > 0 ? entry.tvl_usd : 0;
   const age = daysListed(universe, entry);
   const ageForMaturity = age === null ? tuning.unknown_age_days : age;
-  const growth = Math.min(tuning.growth_cap, Math.max(tuning.growth_floor, entry.change_7d ?? 0));
+  const rawGrowth = entry.change_7d !== null && Number.isFinite(entry.change_7d) ? entry.change_7d : 0;
+  const growth = Math.min(tuning.growth_cap, Math.max(tuning.growth_floor, rawGrowth));
   const growthMult = 1 + (growth / 100) * tuning.growth_weight;
   const maturityMult =
     tuning.maturity_floor +
@@ -265,7 +267,7 @@ export function scoreProtocol(
   const implied = Math.max(
     1,
     Math.round(
-      entry.tvl_usd *
+      safeTvl *
         tuning.base_multiple *
         growthMult *
         maturityMult *
@@ -401,7 +403,7 @@ function liveEntries(universe: Universe): LiveEntry[] {
 }
 
 // Score every genuine candidate and rank the board, strongest first.
-// Ties keep the snapshot's own order (its protocols are sorted by slug).
+// Ties break deterministically by TVL descending, then slug ascending.
 export function buildPayload(universe: Universe, tuning: Tuning = TUNING): RadarPayload {
   const watchlist = new Set(universe.watchlist);
   const scored = universe.protocols
@@ -410,7 +412,12 @@ export function buildPayload(universe: Universe, tuning: Tuning = TUNING): Radar
       const { implied, parts } = scoreProtocol(universe, entry, tuning);
       return { entry, implied, parts, listed: watchlist.has(entry.slug) };
     })
-    .sort((a, b) => b.implied - a.implied);
+    .sort(
+      (a, b) =>
+        b.implied - a.implied ||
+        b.entry.tvl_usd - a.entry.tvl_usd ||
+        (a.entry.slug < b.entry.slug ? -1 : a.entry.slug > b.entry.slug ? 1 : 0),
+    );
   const rows: BoardRow[] = scored.map((item, index) => {
     const entry = item.entry;
     const parts = item.parts;
@@ -459,9 +466,10 @@ export function boardForGate(payload: RadarPayload): Record<string, unknown>[] {
 // range, and farm steps in count and in length.
 export function boardProblem(board: Record<string, unknown>[], universe: Universe): string | null {
   const slugs = board.map((row) => row.slug as string);
+  const slugSet = new Set(slugs);
   const count = board.length;
   if (count < 100 || count > 4000) return `board has ${count} rows, outside 100 to 4000`;
-  if (new Set(slugs).size !== count) return 'board has a repeated slug';
+  if (slugSet.size !== count) return 'board has a repeated slug';
   const ranks = new Set(board.map((row) => row.rank as number));
   if (
     ranks.size !== count ||
@@ -470,7 +478,7 @@ export function boardProblem(board: Record<string, unknown>[], universe: Univers
     return 'board ranks are not exactly 1 to N';
   }
   for (const slug of universe.watchlist) {
-    if (!slugs.includes(slug)) return `board misses a watchlist protocol: ${slug}`;
+    if (!slugSet.has(slug)) return `board misses a watchlist protocol: ${slug}`;
   }
   const genuine = new Set(universe.protocols.filter(isLaunchCandidate).map((entry) => entry.slug));
   for (const slug of slugs) {

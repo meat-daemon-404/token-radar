@@ -5,14 +5,15 @@
 // with the radar-2 model in lib/model.ts, and writes the ranked board to
 // /output/board.json. It copies this repository's dashboard/ to /output,
 // writes /output/data.js from the same board for the page to read, copies
-// the three screenshots into /output/screenshots/, and last writes
-// /output/dossier.json — the summary the judge reads — with the vendored
-// make.fun library.
+// or decodes the three screenshots into /output/screenshots/, and last
+// writes /output/dossier.json — the summary the judge reads — with the
+// vendored make.fun library.
 //
 // The three screenshots are genuine renders of this dashboard in a
 // headless browser: the board, a detail view and a filtered view. They
-// live in this repository as real PNG files, and this program copies
-// them unchanged, so two runs write the same bytes.
+// live in this repository as PNG/JPEG files or base64 text (.png.b64 /
+// .jpg.b64 / .jpeg.b64), and this program writes the exact decoded bytes
+// unchanged, so two runs write the same bytes.
 //
 // The dashboard is a static page, no framework and no network:
 // dashboard/index.html, dashboard/app.css and dashboard/app.js read
@@ -80,7 +81,7 @@ function copyDirectory(from: string, dest: string): string[] {
   }
   mkdirSync(dest, { recursive: true });
   const landed: string[] = [];
-  for (const name of readdirSync(from)) {
+  for (const name of readdirSync(from).sort()) {
     if (name.charAt(0) === '.') continue;
     const source = joinPath(from, name);
     if (!statSync(source).isFile()) continue;
@@ -92,52 +93,65 @@ function copyDirectory(from: string, dest: string): string[] {
 
 const dashboardNames = copyDirectory(joinPath(repoRoot, 'dashboard'), joinPath(outDir, 'dashboard'));
 
-// Copy the screenshots, checking each one is a real PNG or JPEG inside
-// the caps, with a long side at most 1440 and a short side at least 800.
+// Copy or decode the screenshots (.png/.jpg/.jpeg or .png.b64/.jpg.b64/.jpeg.b64),
+// checking each one is a real PNG or JPEG inside the caps, with a long side at
+// most 1440 and a short side at least 800.
 function copyShots(from: string, dest: string): string[] {
   if (!existsSync(from)) {
     return [];
   }
   mkdirSync(dest, { recursive: true });
   const landed: string[] = [];
+  const seen = new Set<string>();
   const names = readdirSync(from).sort();
   for (const name of names) {
     if (name.charAt(0) === '.') continue;
-    if (!name.endsWith('.png') && !name.endsWith('.jpg') && !name.endsWith('.jpeg')) continue;
+    const isB64 = name.endsWith('.png.b64') || name.endsWith('.jpg.b64') || name.endsWith('.jpeg.b64');
+    const isRaw = name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
+    if (!isRaw && !isB64) continue;
+    const outName = isB64 ? name.slice(0, -4) : name;
+    if (seen.has(outName)) continue;
     const source = joinPath(from, name);
     if (!statSync(source).isFile()) continue;
-    const bytes = readFileSync(source);
+    const bytes = isB64
+      ? Buffer.from(readFileSync(source, 'utf8').replace(/\s+/g, ''), 'base64')
+      : readFileSync(source);
     const png =
-      bytes.length > 8 &&
+      bytes.length >= 24 &&
       bytes[0] === 0x89 &&
       bytes[1] === 0x50 &&
       bytes[2] === 0x4e &&
-      bytes[3] === 0x47;
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a;
     const jpeg = bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
     if (!png && !jpeg) fail(`screenshots/${name} is neither a PNG nor a JPEG`, 1);
     if (bytes.length > SHOT_LIMIT.max_bytes) {
-      fail(`screenshots/${name} is ${bytes.length} bytes, over the 512 KiB cap`, 1);
+      fail(`screenshots/${outName} is ${bytes.length} bytes, over the 512 KiB cap`, 1);
     }
     if (png) {
       const wide = bytes.readUInt32BE(16);
       const tall = bytes.readUInt32BE(20);
       if (Math.max(wide, tall) > 1440 || Math.min(wide, tall) < 800) {
         fail(
-          `screenshots/${name} is ${wide}x${tall}: long side at most 1440, short side at least 800`,
+          `screenshots/${outName} is ${wide}x${tall}: long side at most 1440, short side at least 800`,
           1,
         );
       }
     }
-    writeFileSync(joinPath(dest, name), bytes);
-    landed.push(name);
+    writeFileSync(joinPath(dest, outName), bytes);
+    seen.add(outName);
+    landed.push(outName);
   }
   return landed;
 }
 
 const shotNames = copyShots(joinPath(repoRoot, 'screenshots'), joinPath(outDir, 'screenshots'));
-if (shotNames.length < 3) {
+if (shotNames.length < 3 || shotNames.length > SHOT_LIMIT.max) {
   fail(
-    `screenshots/ holds ${shotNames.length} image${shotNames.length === 1 ? '' : 's'}: hand in 3, the board, a detail view and a filtered view`,
+    `screenshots/ holds ${shotNames.length} image${shotNames.length === 1 ? '' : 's'}: hand in 3 to ${SHOT_LIMIT.max} (the board, a detail view and a filtered view)`,
     1,
   );
 }

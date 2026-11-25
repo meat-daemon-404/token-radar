@@ -19,14 +19,17 @@
   </section>
   <section class="leaders" id="top5" aria-label="Top five"></section>
   <section class="filters">
-    <input id="q" type="search" placeholder="Search a protocol…" aria-label="Search a protocol">
+    <input id="q" type="search" placeholder="Search a protocol… (press /)" aria-label="Search a protocol">
     <select id="category" aria-label="Filter by category"><option value="">All categories</option></select>
     <select id="chain" aria-label="Filter by chain"><option value="">All chains</option></select>
+    <button id="pill-watchlist" class="pill" aria-pressed="false" title="Show only watchlist protocols">★ Watchlist</button>
+    <button id="pill-breakout" class="pill" aria-pressed="false" title="Show only young, fast-growing protocols">⚡ Breakout</button>
+    <button id="clear-filters" class="pill clear-btn" hidden>Clear</button>
     <div class="view-tabs" role="tablist">
       <button id="tab-pre" role="tab" aria-selected="true">Pre-token</button>
       <button id="tab-live" role="tab" aria-selected="false">Live tokens</button>
     </div>
-    <button id="sandbox-toggle" aria-expanded="true">Close model sandbox</button>
+    <button id="sandbox-toggle" aria-expanded="true">Hide sandbox</button>
   </section>
   <section class="sandbox" id="sandbox">
     <strong>Model sandbox</strong>
