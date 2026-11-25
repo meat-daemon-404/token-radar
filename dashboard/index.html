@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — which pre-token protocol to farm next</title>
+<link href="app.css" rel="stylesheet">
+</head>
+<body>
+<header class="topbar">
+  <div class="wordmark"><span class="dot">◉</span> Token Radar</div>
+  <div class="snapshot-line" id="meta">Loading the snapshot…</div>
+</header>
+<main>
+  <section class="intro">
+    <h1>Which pre-token protocol is worth farming next?</h1>
+    <p id="lede-text">Every protocol the snapshot records with no token, ranked by what its launch would be worth — with a farm plan for each one.</p>
+    <p class="headline-numbers" id="facts"></p>
+  </section>
+  <section class="leaders" id="top5" aria-label="Top five"></section>
+  <section class="filters">
+    <input id="q" type="search" placeholder="Search a protocol…" aria-label="Search a protocol">
+    <select id="category" aria-label="Filter by category"><option value="">All categories</option></select>
+    <select id="chain" aria-label="Filter by chain"><option value="">All chains</option></select>
+    <div class="view-tabs" role="tablist">
+      <button id="tab-pre" role="tab" aria-selected="true">Pre-token</button>
+      <button id="tab-live" role="tab" aria-selected="false">Live tokens</button>
+    </div>
+    <button id="sandbox-toggle" aria-expanded="true">Close model sandbox</button>
+  </section>
+  <section class="sandbox" id="sandbox">
+    <strong>Model sandbox</strong>
+    <span class="sandbox-hint">Changes only this page.</span>
+    <label>Base <span id="base-val"></span><input id="base" type="range" min="0.10" max="0.50" step="0.01" value="0.25"></label>
+    <label>Growth <span id="growth-val"></span><input id="growth" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+    <button id="sandbox-reset">Reset</button>
+  </section>
+  <section class="board-wrap">
+    <table id="board">
+      <thead><tr>
+        <th data-sort="rank">#</th>
+        <th data-sort="name">Protocol</th>
+        <th data-sort="category">Category</th>
+        <th data-sort="tvl_usd" class="num">TVL</th>
+        <th data-sort="change_7d" class="num">7d</th>
+        <th data-sort="age_days" class="num">Age</th>
+        <th data-sort="chains" class="num">Chains</th>
+        <th data-sort="implied_value_usd" class="num">Implied value</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="showing" id="count"></p>
+  </section>
+  <section class="how">
+    <h2>How the ranking works</h2>
+    <p class="formula-line">implied = TVL × 0.25 × growth × maturity × chains × category × breakout</p>
+    <p>Growth is the seven-day TVL change, clamped to −60%…+120%. Maturity is how long the protocol has run with no token (0.6–1.0). Chains rewards a multi-chain footprint (up to 1.20). Category gives 1.10 to fee-earning categories (Dexs, Lending, Derivatives, Yield) and 0.90 to RWA and stablecoins. Breakout (1.10) marks a protocol younger than 180 days growing faster than 20% in a week. No protocol name is special-cased: the ranking follows only from the snapshot's own figures.</p>
+    <p>A protocol counts as a launch candidate only when it records no token <em>and</em> is not a wrapped, staked or bridged product of a token that already trades — the same rule the watchlist itself uses. Wrapped Bitcoin, staked ETH and bridge tokens are left out: none of them is a protocol still waiting on a launch of its own.</p>
+    <p class="caveat">Implied value is this radar's own claim, never a promise. A protocol is said to record no token, never to have none: the snapshot is DefiLlama's record, not proof. Farming costs gas and time, and an airdrop may never come.</p>
+  </section>
+  <footer class="colophon" id="foot"></footer>
+</main>
+<dialog id="detail" class="detail"></dialog>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
